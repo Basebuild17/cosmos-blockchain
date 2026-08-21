@@ -1,0 +1,35 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Output files
+/myblockaind
+/myblockchainicli
+/build/
+
+# Go
+/vendor/
+go.sum
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test files
+coverage.out
+*.test
+
+# Node data
+.myblockchain/
+
+# Protobuf generated files
+*.pb.go
+*.pb.*.go
