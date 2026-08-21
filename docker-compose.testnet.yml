@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Validator 1
+  validator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: myblockchain-validator-1
+    volumes:
+      - validator-1-data:/home/myblockchain/.myblockchain
+    ports:
+      - "26656:26656"  # P2P
+      - "26657:26657"  # RPC
+      - "1317:1317"    # REST API
+      - "9090:9090"    # gRPC
+    environment:
+      - CHAIN_ID=mychain-testnet
+      - MONIKER=validator-1
+    command: start
+    restart: unless-stopped
+    networks:
+      - myblockchain
+
+  # Validator 2
+  validator-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: myblockchain-validator-2
+    volumes:
+      - validator-2-data:/home/myblockchain/.myblockchain
+    ports:
+      - "26666:26656"  # P2P
+      - "26667:26657"  # RPC
+      - "1318:1317"    # REST API
+      - "9091:9090"    # gRPC
+    environment:
+      - CHAIN_ID=mychain-testnet
+      - MONIKER=validator-2
+    command: start
+    restart: unless-stopped
+    networks:
+      - myblockchain
+    depends_on:
+      - validator-1
+
+  # Validator 3
+  validator-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: myblockchain-validator-3
+    volumes:
+      - validator-3-data:/home/myblockchain/.myblockchain
+    ports:
+      - "26676:26656"  # P2P
+      - "26677:26657"  # RPC
+      - "1319:1317"    # REST API
+      - "9092:9090"    # gRPC
+    environment:
+      - CHAIN_ID=mychain-testnet
+      - MONIKER=validator-3
+    command: start
+    restart: unless-stopped
+    networks:
+      - myblockchain
+    depends_on:
+      - validator-1
+
+volumes:
+  validator-1-data:
+    driver: local
+  validator-2-data:
+    driver: local
+  validator-3-data:
+    driver: local
+
+networks:
+  myblockchain:
+    driver: bridge

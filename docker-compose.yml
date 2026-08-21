@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Single validator node
+  validator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: myblockchain-validator
+    volumes:
+      - validator-data:/home/myblockchain/.myblockchain
+    ports:
+      - "26656:26656"  # P2P
+      - "26657:26657"  # RPC
+      - "1317:1317"    # REST API
+      - "9090:9090"    # gRPC
+    environment:
+      - CHAIN_ID=mychain-1
+      - MONIKER=myvalidator
+    command: start
+    restart: unless-stopped
+    networks:
+      - myblockchain
+
+  # CLI client (optional)
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    container_name: myblockchain-cli
+    volumes:
+      - validator-data:/home/myblockchain/.myblockchain
+    stdin_open: true
+    tty: true
+    networks:
+      - myblockchain
+    depends_on:
+      - validator
+
+volumes:
+  validator-data:
+    driver: local
+
+networks:
+  myblockchain:
+    driver: bridge

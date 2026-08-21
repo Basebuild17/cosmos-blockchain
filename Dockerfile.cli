@@ -1,0 +1,31 @@
+# Dockerfile for CLI client
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+
+RUN apk add --no-cache git make gcc musl-dev
+
+COPY . .
+
+RUN go mod download
+
+RUN make build-cli
+
+# Final stage
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates jq bash
+
+RUN addgroup -g 1000 myblockchain && \
+    adduser -D -u 1000 -G myblockchain myblockchain
+
+WORKDIR /home/myblockchain
+
+COPY --from=builder /app/myblockchainicli /usr/local/bin/
+
+RUN mkdir -p /home/myblockchain/.myblockchain && \
+    chown -R myblockchain:myblockchain /home/myblockchain
+
+USER myblockchain
+
+ENTRYPOINT ["myblockchainicli"]
