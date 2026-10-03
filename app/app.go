@@ -1,101 +1,97 @@
 package app
 
 import (
+	"io"
+
+	wasmapp "github.com/CosmWasm/wasmd/app"
+	wasmparams "github.com/CosmWasm/wasmd/app/params"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	codeTypes "github.com/cosmos/cosmos-sdk/codec/types"
-	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/server"
-	"github.com/cosmos/cosmos-sdk/server/api"
-	"github.com/cosmos/cosmos-sdk/server/config"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/module"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/cosmos/cosmos-sdk/x/auth/vesting"
-	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/cosmos/cosmos-sdk/x/upgrade"
-	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	"github.com/tendermint/tendermint/libs/log"
-	tmdb "github.com/tendermint/tm-db"
-
-	"github.com/Basebuild17/cosmos-blockchain/x/registry"
-	registrytypes "github.com/Basebuild17/cosmos-blockchain/x/registry/types"
+	"github.com/cometbft/cometbft/libs/log"
+	dbm "github.com/cometbft/cometbft-db"
 )
 
-// MyBlockchainApp extends an ABCI application, but with most of its logic to
-// live in the ~/ modules.
+// MyBlockchainApp embeds the standard wasmd application so this chain gets
+// CosmWasm's keeper, gas metering, permissions, messages, queries, and CLI.
 type MyBlockchainApp struct {
-	*runtime.App
-	cdc *codec.LegacyCodec
-
-	registry registry.AppModule
+	*wasmapp.WasmApp
 }
 
-// NewMyBlockchainApp returns a reference to an initialized blockchain app
-func NewMyBlockchainApp(
-	logger log.Logger,
-	db tmdb.DB,
-	traceStore string,
-	loadLatest bool,
-) *MyBlockchainApp {
-	// Create the application codec
-	encodingConfig := MakeEncodingConfig()
-
-	app := &MyBlockchainApp{
-		cdc: encodingConfig.Codec.(*codec.LegacyCodec),
-	}
-
-	// Initialize the runtime app
-	app.App = runtime.NewApp(
-		"myblockchain",
+// NewMyBlockchainApp creates a CosmWasm-enabled application.
+func NewMyBlockchainApp(logger log.Logger, db dbm.DB, traceStore string, loadLatest bool) *MyBlockchainApp {
+	app := wasmapp.NewWasmApp(
 		logger,
 		db,
-		encodingConfig.TxConfig,
-		runtime.DefaultAppOptions{
-			TxDecoder: encodingConfig.TxConfig.TxDecoder(),
-		},
+		io.Discard,
+		loadLatest,
+		server.DefaultAppOptions{},
+		[]wasmkeeper.Option{},
 	)
 
-	// Register modules
-	app.registry = registry.NewAppModule()
-
-	// Return app
-	return app
+	return &MyBlockchainApp{WasmApp: app}
 }
 
-// EncodingConfig specifies the concrete encoding types to use for a given app.
-type EncodingConfig struct {
-	InterfaceRegistry codecTypes.InterfaceRegistry
-	Codec             codec.Codec
-	TxConfig          client.TxConfig
-	Amino             *codec.LegacyCodec
-}
+// EncodingConfig is the encoding configuration used by wasmd.
+type EncodingConfig = wasmparams.EncodingConfig
 
-// MakeEncodingConfig creates the SerializationConfig for this app
+// MakeEncodingConfig returns the standard CosmWasm encoding configuration.
 func MakeEncodingConfig() EncodingConfig {
-	amino := codec.NewLegacyAmino()
-	interfaceRegistry := codecTypes.NewInterfaceRegistry()
-	marshaler := codec.NewProtoCodec(interfaceRegistry)
-
-	txCfg := authtypes.StdTxConfig{Cdc: amino}
-
-	return EncodingConfig{
-		InterfaceRegistry: interfaceRegistry,
-		Codec:             marshaler,
-		TxConfig:          txCfg,
-		Amino:             amino,
-	}
+	return wasmapp.MakeEncodingConfig()
 }
 
-// GetTxConfig returns the TxConfig
+// GetTxConfig returns the transaction configuration for signing and decoding.
 func (app *MyBlockchainApp) GetTxConfig() client.TxConfig {
-	return app.App.TxConfig
+	return app.TxConfig()
 }
 
-// GetCodec returns the codec
+// GetCodec returns the application codec.
 func (app *MyBlockchainApp) GetCodec() codec.Codec {
-	return app.cdc
+	return app.AppCodec()
 }
+# VeilPay — private-payments prototype
+
+VeilPay is a small, local **permissioned-ledger prototype** for exploring private
+payments. A validator accepts transfers only from registered wallets, verifies a
+wallet signature, prevents replay, and commits accepted transfers into a
+hash-linked chain.
+
+It is intentionally a learning/MVP implementation, not a cryptocurrency to
+deploy with real funds.
+
+## Run the demo
+
+Requires Python 3.11+ and no external packages.
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 demo.py
+```
+
+The demo creates two wallets, funds Alice in the genesis block, sends Bob a
+payment with an encrypted memo, then verifies the whole chain.
+
+## Privacy boundary
+
+Wallet secrets never leave the client and the optional payment memo is encrypted
+for the recipient. Validator membership is allow-listed.
+
+Amounts, sender addresses, and recipient addresses are still visible to
+validators. **This is not confidential-transactions or zero-knowledge privacy.**
+Those guarantees need a reviewed protocol and audited cryptographic library;
+they must not be improvised in application code.
+
+## Layout
+
+- `veilpay.wallet` creates and signs with locally held secrets.
+- `veilpay.ledger` validates transactions, prevents replay, and maintains blocks.
+- `demo.py` is the smallest end-to-end example.
+
+## Before real deployment
+
+Replace the educational shared-secret wallet model with a vetted Ed25519 library,
+store keys in an HSM or operating-system keychain, use mutually authenticated TLS
+between nodes, persist state atomically, add Byzantine-fault tolerant consensus,
+and complete an independent security review. For true payment privacy, adopt a
+reviewed confidential-transactions or zero-knowledge protocol.
